@@ -24,111 +24,96 @@ import com.google.firebase.auth.PhoneAuthOptions;
 import com.google.firebase.auth.PhoneAuthProvider;
 
 import java.util.concurrent.TimeUnit;
-
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 public class MainActivity extends AppCompatActivity {
 
 
-    EditText mEditTextNumberPhone;
-    Button mButtonSend;
-    TextView mTextViewResponse;
-    FirebaseAuth mAuth;
-    PhoneAuthProvider.OnVerificationStateChangedCallbacks mCallbacks;
+    EditText mEditTextEmail;
+    EditText mEditTextPass;
+    Button mButtonInicio;
+    TextView mTextViewRespuesta;
+    TextView mTextViewIrRegistrar;
 
+    FirebaseAuth mAuth;
+
+    String email;
+    String pass;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mEditTextNumberPhone = findViewById(R.id.idnumber);
-        mButtonSend = findViewById(R.id.btnSend);
-        mTextViewResponse = findViewById(R.id.twResponse);
+        mEditTextEmail = findViewById(R.id.editTextEmail);
+        mEditTextPass = findViewById(R.id.editTextPass);
+        mButtonInicio = findViewById(R.id.btnInicio);
+        mTextViewRespuesta = findViewById(R.id.textViewRespuesta);
+        mTextViewIrRegistrar = findViewById(R.id.textViewIrRegistrar);
 
         mAuth = FirebaseAuth.getInstance();
 
-        mAuth.setLanguageCode("es");
-
-        mButtonSend.setOnClickListener(new View.OnClickListener() {
+        mTextViewIrRegistrar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String phoneNumber = "+" + mEditTextNumberPhone.getText().toString();
-                if(!phoneNumber.isEmpty()){
-                    PhoneAuthOptions options =
-                            PhoneAuthOptions.newBuilder(mAuth)
-                                    .setPhoneNumber(phoneNumber)       // Phone number to verify
-                                    .setTimeout(60L, TimeUnit.SECONDS) // Timeout and unit
-                                    .setActivity(MainActivity.this)                 // Activity (for callback binding)
-                                    .setCallbacks(mCallbacks)          // OnVerificationStateChangedCallbacks
-                                    .build();
-                    PhoneAuthProvider.verifyPhoneNumber(options);
-                }else{
-                    mTextViewResponse.setText("Ingrese el numero de telefono con su respectivo codigo de Pais");
-                    mTextViewResponse.setTextColor(Color.RED);
-                }
+                Intent intent = new Intent(MainActivity.this, RegistroActivity.class);
+                startActivity(intent);
             }
         });
 
-        mCallbacks = new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+        mButtonInicio.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onVerificationCompleted(@NonNull PhoneAuthCredential phoneAuthCredential) {
-                //Iniciamos secion
-                iniciarSesion(phoneAuthCredential);
-            }
+            public void onClick(View v) {
+                email = mEditTextEmail.getText().toString().trim();
+                pass = mEditTextPass.getText().toString().trim();
 
-            @Override
-            public void onVerificationFailed(@NonNull FirebaseException e) {
-                //Falló el inicio de sesion
-                mTextViewResponse.setText(e.getMessage());
-                mTextViewResponse.setTextColor(Color.RED);
-            }
+                if (email.isEmpty() || pass.isEmpty()) {
+                    mTextViewRespuesta.setText("Ingrese el email y la contraseña");
+                    mTextViewRespuesta.setTextColor(Color.RED);
 
-            @Override
-            public void onCodeSent(@NonNull String s, @NonNull PhoneAuthProvider.ForceResendingToken forceResendingToken) {
-                super.onCodeSent(s, forceResendingToken);
-                mTextViewResponse.setText("El codigo de verificacion fue enviad");
-                mTextViewResponse.setTextColor(Color.BLACK);
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        Intent intent = new Intent(MainActivity.this, VerificacionActivity.class);
-                        intent.putExtra("auth", s);
-                        startActivity(intent);
+                } else {
+                    if (emailValido(email)) {
+                        mAuth.signInWithEmailAndPassword(email, pass).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+                            @Override
+                            public void onComplete(@NonNull Task<AuthResult> task) {
+                                if (task.isSuccessful()) {
+                                    mTextViewRespuesta.setText("CORRECTO");
+                                    mTextViewRespuesta.setTextColor(Color.GREEN);
+                                    irHome();
+                                } else {
+                                    mTextViewRespuesta.setText("CREDENCIALES INCORRECTAS");
+                                    mTextViewRespuesta.setTextColor(Color.RED);
+                                }
+                            }
+                        });
+                    } else {
+                        mTextViewRespuesta.setText("Email invalido");
+                        mTextViewRespuesta.setTextColor(Color.RED);
                     }
-                },1000);
+                }
             }
-        };
+        });
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        FirebaseUser user = mAuth.getCurrentUser();
-        if (user != null){
-            inicioActivityHome();
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if(currentUser != null){
+            irHome();
         }
     }
 
-
-    private void iniciarSesion(PhoneAuthCredential credential){
-        mAuth.signInWithCredential(credential).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
-            @Override
-            public void onComplete(@NonNull Task<AuthResult> task) {
-                if(task.isSuccessful()){
-                    inicioActivityHome();
-                }else{
-                    mTextViewResponse.setText(task.getException().getMessage());
-                    mTextViewResponse.setTextColor(Color.RED);
-                }
-            }
-
-        });
-    }
-
-
-    private void inicioActivityHome() {
+    private void irHome(){
         Intent intent = new Intent(MainActivity.this, HomeActivity.class);
         startActivity(intent);
         finish();
+    }
+    private boolean emailValido(String email) {
+        String expression = "^[\\w\\.-]+@([\\w\\-]+\\.)+[A-Z]{2,4}$";
+        Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(email);
+        return matcher.matches();
     }
 
 
